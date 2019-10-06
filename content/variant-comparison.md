@@ -238,8 +238,8 @@ code as close to the C version as possible. Let's see how well it does.
 ```text
 0000000000000000 <int dsumtype.do_visit(ExampleSumType)>:
    0:    push   %rax
-   1:    movsbq 0x10(%rsp),%rax
-   7:    cmp    $0xa,%rax          # check if type index is out-of-bounds
+   1:    movsbq 0x10(%rsp),%rax    # get type index from stack
+   7:    cmp    $0xa,%rax          # check if type index is in-bounds
    b:    jae    19
    d:    lea    0x0(%rip),%rcx     # load address of global array
   14:    mov    (%rcx,%rax,4),%eax # get result from global array
