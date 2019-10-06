@@ -137,6 +137,9 @@ just gives up after too many layers of template-metaprogramming gunk?
 Regardless, it's bad news for fans of zero-cost abstractions, since there's a
 clear overhead here compared to the C assembly.
 
+\[UPDATE: Reddit user matthieum [suggests][9] that the function pointers
+themselves are likely to blame.\]
+
 #### D, with Algebraic
 
 This version uses the sum type implementation from D's standard library,
@@ -260,6 +263,9 @@ respectively.
 Still, I think it's fair to say that this is a true zero-cost abstraction, and
 that the claim of "zero overhead compared to hand-written C" is justified.
 
+\[UPDATE: Reddit user ais52 [explains][10] that the purpose of the `push`/`pop`
+pair is to adjust the alignment of the stack pointer.\]
+
 ### Conclusions
 
 If creating a zero-overhead generic sum type is so easy that even I can do it,
@@ -291,3 +297,5 @@ and beating `std::visit` entirely by accident.
 [6]: https://github.com/pbackus/variant-comparison
 [7]: https://en.cppreference.com/w/cpp/utility/variant/visit
 [8]: https://blog.codinghorror.com/falling-into-the-pit-of-success/
+[9]: https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2jrkrc/
+[10]: https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2oe4hu/
