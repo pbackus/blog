@@ -149,6 +149,8 @@ return.)</p>
 just gives up after too many layers of template-metaprogramming gunk?
 Regardless, it's bad news for fans of zero-cost abstractions, since there's a
 clear overhead here compared to the C assembly.</p>
+<p>[UPDATE: Reddit user matthieum <a href="https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2jrkrc/">suggests</a> that the function pointers
+themselves are likely to blame.]</p>
 <h4>D, with Algebraic</h4>
 <p>This version uses the sum type implementation from D's standard library,
 Phobos. Rather than create a dedicated sum type, the Phobos developers opted to
@@ -239,8 +241,8 @@ compile-time reflection and metaprogramming capabilities to try to generate
 code as close to the C version as possible. Let's see how well it does.</p>
 <div class="highlight"><pre><span></span>0000000000000000 &lt;int dsumtype.do_visit(ExampleSumType)&gt;:
    0:    push   %rax
-   1:    movsbq 0x10(%rsp),%rax
-   7:    cmp    $0xa,%rax          # check if type index is out-of-bounds
+   1:    movsbq 0x10(%rsp),%rax    # get type index from stack
+   7:    cmp    $0xa,%rax          # check if type index is in-bounds
    b:    jae    19
    d:    lea    0x0(%rip),%rcx     # load address of global array
   14:    mov    (%rcx,%rax,4),%eax # get result from global array
@@ -263,6 +265,8 @@ whereas this version has a <code>push</code> and a <code>pop</code> at the begin
 respectively.</p>
 <p>Still, I think it's fair to say that this is a true zero-cost abstraction, and
 that the claim of "zero overhead compared to hand-written C" is justified.</p>
+<p>[UPDATE: Reddit user ais52 <a href="https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2oe4hu/">explains</a> that the purpose of the <code>push</code>/<code>pop</code>
+pair is to adjust the alignment of the stack pointer.]</p>
 <h3>Conclusions</h3>
 <p>If creating a zero-overhead generic sum type is so easy that even I can do it,
 why doesn't C++ have one? Are the <code>libc++</code> developers a bunch of dummies?</p>

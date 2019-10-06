@@ -121,6 +121,8 @@ return.)&lt;/p&gt;
 just gives up after too many layers of template-metaprogramming gunk?
 Regardless, it's bad news for fans of zero-cost abstractions, since there's a
 clear overhead here compared to the C assembly.&lt;/p&gt;
+&lt;p&gt;[UPDATE: Reddit user matthieum &lt;a href="https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2jrkrc/"&gt;suggests&lt;/a&gt; that the function pointers
+themselves are likely to blame.]&lt;/p&gt;
 &lt;h4&gt;D, with Algebraic&lt;/h4&gt;
 &lt;p&gt;This version uses the sum type implementation from D's standard library,
 Phobos. Rather than create a dedicated sum type, the Phobos developers opted to
@@ -211,8 +213,8 @@ compile-time reflection and metaprogramming capabilities to try to generate
 code as close to the C version as possible. Let's see how well it does.&lt;/p&gt;
 &lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;0000000000000000 &amp;lt;int dsumtype.do_visit(ExampleSumType)&amp;gt;:
    0:    push   %rax
-   1:    movsbq 0x10(%rsp),%rax
-   7:    cmp    $0xa,%rax          # check if type index is out-of-bounds
+   1:    movsbq 0x10(%rsp),%rax    # get type index from stack
+   7:    cmp    $0xa,%rax          # check if type index is in-bounds
    b:    jae    19
    d:    lea    0x0(%rip),%rcx     # load address of global array
   14:    mov    (%rcx,%rax,4),%eax # get result from global array
@@ -235,6 +237,8 @@ whereas this version has a &lt;code&gt;push&lt;/code&gt; and a &lt;code&gt;pop&l
 respectively.&lt;/p&gt;
 &lt;p&gt;Still, I think it's fair to say that this is a true zero-cost abstraction, and
 that the claim of "zero overhead compared to hand-written C" is justified.&lt;/p&gt;
+&lt;p&gt;[UPDATE: Reddit user ais52 &lt;a href="https://www.reddit.com/r/programming/comments/ddi5wb/beating_stdvisit_without_really_trying/f2oe4hu/"&gt;explains&lt;/a&gt; that the purpose of the &lt;code&gt;push&lt;/code&gt;/&lt;code&gt;pop&lt;/code&gt;
+pair is to adjust the alignment of the stack pointer.]&lt;/p&gt;
 &lt;h3&gt;Conclusions&lt;/h3&gt;
 &lt;p&gt;If creating a zero-overhead generic sum type is so easy that even I can do it,
 why doesn't C++ have one? Are the &lt;code&gt;libc++&lt;/code&gt; developers a bunch of dummies?&lt;/p&gt;
