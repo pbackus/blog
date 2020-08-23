@@ -54,7 +54,7 @@ compiled with optimization level <code>-O2</code>.</p>
   and returns a unique integer for each possible type the sum type can hold.</li>
 </ul>
 <p>For illustration's sake, here's the C++ version, slightly abridged:</p>
-<div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;variant&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span> <span class="cpf">&lt;variant&gt;</span><span class="cp"></span>
 
 <span class="c1">// Source: https://en.cppreference.com/w/cpp/utility/variant/visit</span>
 <span class="k">template</span><span class="o">&lt;</span><span class="n">class</span><span class="p">...</span> <span class="n">Ts</span><span class="o">&gt;</span> <span class="k">struct</span> <span class="nl">overloaded</span> <span class="p">:</span> <span class="n">Ts</span><span class="p">...</span> <span class="p">{</span> <span class="k">using</span> <span class="n">Ts</span><span class="o">::</span><span class="k">operator</span><span class="p">()...;</span> <span class="p">};</span>
@@ -76,7 +76,7 @@ compiled with optimization level <code>-O2</code>.</p>
         <span class="p">[](</span><span class="n">T9</span> <span class="n">val</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="mi">233</span><span class="p">;</span> <span class="p">},</span>
     <span class="p">},</span> <span class="n">v</span><span class="p">);</span>
 <span class="p">}</span>
-</pre></div>
+</code></pre></div>
 
 
 <p>After compiling each program, I used <code>objdump</code> to disassemble them, and
@@ -91,7 +91,7 @@ and a switch statement for its "visit" function. It's the straightforward,
 obvious implementation you'd use if you were writing the code by hand, without
 worrying about making it generic, so it makes a good baseline to compare the
 other versions to.</p>
-<div class="highlight"><pre><span></span>00000000000000a0 &lt;do_visit&gt;:
+<div class="highlight"><pre><span></span><code>00000000000000a0 &lt;do_visit&gt;:
   a0:    cmp    $0xa,%edi         # check if type index is in-bounds
   a3:    jae    b0
   a5:    movslq %edi,%rax
@@ -105,7 +105,7 @@ other versions to.</p>
   bb:    mov    $0x0,%ecx
   c0:    mov    $0x45,%edx
   c5:    callq  ca                # __assert_fail
-</pre></div>
+</code></pre></div>
 
 
 <p>As you might expect, the compiler is able to optimize the entire thing down
@@ -117,7 +117,7 @@ helper template</a> from cppreference.com to allow passing a set of labmda
 functions as a visitor. This is standard-library code, so we should expect it
 to be as well-optimized as the best and brightest C++ developers around can
 make it.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;do_visit(std::__1::example_variant)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;do_visit(std::__1::example_variant)&gt;:
    0:    sub    $0x18,%rsp
    4:    mov    %rdi,%rax
    7:    mov    %rdi,0x8(%rsp)
@@ -135,7 +135,7 @@ make it.</p>
 
   # Error path
   38:    callq  3d               # __throw_bad_variant_access
-</pre></div>
+</code></pre></div>
 
 
 <p>The main thing to notice here is that, unlike in the C version, the compiler is
@@ -156,7 +156,7 @@ Phobos. Rather than create a dedicated sum type, the Phobos developers opted to
 make <code>Algebraic</code> a thin wrapper around <code>Variant</code>, D's equivalent of C++17's
 <code>std::any</code>. That choice turns out to have far-reaching repercussions, as we're
 about to see.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;int dalgebraic.do_visit(ExampleAlgebraic)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;int dalgebraic.do_visit(ExampleAlgebraic)&gt;:
    0:    jmpq   5 # int std.variant.visitImpl!(true, ExampleAlgebraic, ...)
 
 0000000000000000 &lt;int std.variant.visitImpl!(true, ExampleAlgebraic, ...)
@@ -215,7 +215,7 @@ about to see.</p>
  28a:    mov    $0x4b,%edi
  28f:    mov    $0xa1c,%edx
  294:    callq  299               # call D runtime assert function
-</pre></div>
+</code></pre></div>
 
 
 <p>The good part is that <code>ldc</code> is able to inline the lambdas into the body of
@@ -238,7 +238,7 @@ D code using <code>Algebraic</code>.</p>
 rely at all on runtime type information, and instead uses D's powerful
 compile-time reflection and metaprogramming capabilities to try to generate
 code as close to the C version as possible. Let's see how well it does.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;int dsumtype.do_visit(ExampleSumType)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;int dsumtype.do_visit(ExampleSumType)&gt;:
    0:    push   %rax
    1:    movsbq 0x10(%rsp),%rax    # get type index from stack
    7:    cmp    $0xa,%rax          # check if type index is in-bounds
@@ -253,7 +253,7 @@ code as close to the C version as possible. Let's see how well it does.</p>
   20:    mov    $0x4ca,%edi
   25:    mov    $0x9,%esi
   2a:    callq  2f                 # __switch_error
-</pre></div>
+</code></pre></div>
 
 
 <p>As it turns out, it's almost exactly the same as the C version: a single array

@@ -24,6 +24,241 @@
         </div>
         <div id="wrapper">
             <div id="content">
+                <h4 class="date">Aug 23, 2020</h4>
+                <div class="post">
+<h2 class="title">
+                        <a href="https://pbackus.github.io/blog/how-does-memory-safety-work-in-d.html" rel="bookmark" title="Permanent Link to &quot;How Does Memory Safety Work in D?&quot;">How Does Memory Safety Work in D?</a>
+                    </h2>
+
+                    <p>Recently, in the D community, there's been a good deal of discussion about what
+exactly is meant by "memory safety," and under what circumstances (if any) it's
+appropriate to consider an <code>extern(C)</code> function to be "memory safe." This post
+is my attempt to clarify my own thoughts on the subject by putting them in
+writing.</p>
+<p>None of these ideas are original to me, and many are not even original to D.
+Any mistakes you might notice, however, are almost certainly my own. :)</p>
+<h3>What is Memory Safety?</h3>
+<p>The D language's <a href="https://dlang.org/spec/memory-safe-d.html">specification of memory safety</a> defines "memory
+safety" as follows:</p>
+<blockquote>
+<p>Memory Safety for a program is defined as it being impossible for the program
+to corrupt memory.</p>
+</blockquote>
+<p>This definition is frustratingly vague. What does it mean, exactly, for a
+program to "corrupt memory"? Does an out-of-bounds array access "corrupt
+memory"? Does it matter if the access is a read or a write? And what about
+"impossible"—does it count if a D program causes memory corruption when running
+on faulty hardware? If not, where do we draw the line? The D language
+specification gives no answers to these questions.</p>
+<p>A concept closely related to "memory safety" is "undefined behavior." The <a href="http://port70.net/~nsz/c/c99/n1256.html">C99
+standard</a> defines "undefined behavior" as </p>
+<blockquote>
+<p>behavior, upon use of a nonportable or erroneous program construct or of
+ erroneous data, for which this International Standard imposes no
+ requirements </p>
+</blockquote>
+<p>Many systems languages, including D, adopt this definition.</p>
+<p>It's clear that whatever it may mean to "corrupt memory," a program whose
+behavior is undefined is free to do so; after all, it's free to do anything.
+So, at minimum, a program that is memory safe must have no undefined behavior.</p>
+<p>Whether there is any <em>defined</em> behavior that is also considered "memory
+corruption" is a question I'll return to later.</p>
+<h3>Is @safe Code Memory-Safe?</h3>
+<p>In D, functions marked with <code>@safe</code> are checked automatically for memory
+safety. Assuming these checks are implemented correctly, a program consisting
+only of <code>@safe</code> D code is guaranteed to be memory-safe.</p>
+<p>Unfortunately, it's impossible to write a program that does anything useful
+using only <code>@safe</code> code, because <code>@safe</code> code can't do I/O or make system
+calls. In order to bridge this gap between the world of <code>@safe</code> and the world
+outside, D has <code>@trusted</code> functions, which are allowed to perform operations
+that violate <code>@safe</code>'s checks (including calling unchecked <code>@system</code>
+functions), but can still be called from <code>@safe</code> functions.</p>
+<p>When checking <code>@safe</code> code, the D compiler <em>assumes</em> that all <code>@trusted</code>
+functions are memory-safe. Therefore, in any useful program, your <code>@safe</code> code
+is <em>truly</em> memory-safe only if your <code>@trusted</code> code is also memory-safe.</p>
+<p>Establishing that your <code>@trusted</code> code is memory-safe is left as an excercise
+to the programmer.</p>
+<p>If <code>@safe</code> doesn't actually guarantee memory safety, why is it useful at all?
+Because it reduces the incredibly difficult problem of proving that your entire
+program is memory-safe to the relatively tractable one of proving that your
+<code>@trusted</code> code is memory-safe.</p>
+<h3>Can External Functions be @trusted?</h3>
+<p>What about external library functions, whose source code may not be available?
+Is there any way to prove that such a function is memory-safe?</p>
+<p>The strict, hard-line answer is...no. It's impossible. When you write an
+<code>extern</code> function declaration, the only guarantee you have is that the function
+you call matches the specified signature. The actual implementation of that
+function isn't know until your program is compiled and linked--or in the case
+of dynamic linking, until it's executed!</p>
+<p>Does that mean <code>@trusted</code> is useless? Not quite. To see why, let's look at an
+an example.</p>
+<p>Suppose we're trying to write a memory-safe <code>@trusted</code> wrapper around the C
+library function <code>puts</code>. From reading the C99 standard, we know that <code>puts</code>
+has defined behavior when called with a pointer to a null-terminated string,
+and undefined behavior otherwise, so we write our function as follows:</p>
+<div class="highlight"><pre><span></span><code><span class="nd">@trusted</span> <span class="kt">void</span> <span class="n">safePuts</span><span class="p">(</span><span class="k">const</span><span class="p">(</span><span class="kt">char</span><span class="p">)[]</span> <span class="n">s</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">[$]</span> <span class="p">!=</span> <span class="sc">&#39;\0&#39;</span><span class="p">)</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="n">Exception</span><span class="p">(</span><span class="s">&quot;s must be null-terminated&quot;</span><span class="p">);</span>
+    <span class="n">puts</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">ptr</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div>
+
+
+<p>Now we ask: what would have to go wrong for this function to corrupt memory?</p>
+<p>The array access, <code>s[$]</code>, can't corrupt memory, because array accesses in D are
+bounds-checked. Similarly, we know that comparing two characters and throwing
+an exception are both safe operations, because their behavior as defined by the
+language spec does not include any possibility of memory corruption. The only
+remaining thing that could possibly go wrong is the call to <code>puts</code>.</p>
+<p>Let's assume, for now, that the only way a call to <code>puts</code> can corrupt memory is
+by causing undefined behavior. There are two possible ways this could happen:</p>
+<ol>
+<li>We call <code>puts</code> with something other than a pointer to a null-terminated
+   string.</li>
+<li><code>puts</code> has a bug in its implementation and can cause undefined behavior even
+   when it's called with a null-terminated string.</li>
+</ol>
+<p>We can rule out #1 because our function checks for null-termination before
+calling <code>puts</code>, so the only possibility left is #2. Since the C99 standard
+defines the behavior of <code>puts</code> when it's called with a null-terminated string,
+we can conclude that our code is memory-safe as long as <code>puts</code> conforms to the
+C99 standard.</p>
+<p>This is not a 100% ironclad guarantee, but it's a pretty good one. As long as
+our C library implementation is well-tested, our <code>@trusted</code> code should be
+fine.</p>
+<p>We can apply the same approach to other external functions: assume that they
+behave as described in the relevant standard, specification, or documentation,
+and then prove that our <code>@trusted</code> code is memory-safe as long as that
+assumption holds.</p>
+<h3>Is All Well-Defined Behavior Memory-Safe?</h3>
+<p>The D spec doesn't answer this question directly, but <a href="https://dlang.org/spec/function.html#function-safety">the section on function
+safety</a> gives us some clues.</p>
+<p>Recall that a D program consisting of only <code>@safe</code> code is guaranteed to be
+memory-safe, according to D's definition of memory safety. It follows from this
+that any operation a purely-<code>@safe</code> program is allowed to perform <em>must</em> be a
+memory-safe operation—again, according to the definition of "memory-safe" used
+in the D spec.</p>
+<p>Here's the twist: <code>@safe</code> D code is allowed to dereference a pointer.</p>
+<p>At first glance, this seems impossible. In most systems languages, including D,
+dereferencing a pointer when you're not supposed to is considered undefined
+behavior. How does D get away with allowing <code>@safe</code> code to do this?</p>
+<p>If we scroll down a bit to <a href="https://dlang.org/spec/function.html#safe-values">the section on safe values</a>, we find
+our answer. The D spec divides pointer values into two categories: "valid" and
+"invalid". A valid pointer is one that can be dereferenced without causing
+undefined behavior.</p>
+<p>In purely-<code>@safe</code> D code, every operation that could possibly create an invalid
+pointer is a compile-time error. Pointer arithmetic, casting, and type punning
+are banned. Escape analysis ensures stack pointers are always valid; GC ensures
+heap pointers are always valid.</p>
+<p>Interestingly, <code>@safe</code> D code <em>is</em> allowed to create null pointers, which
+implies that in D, the behavior of dereferencing <code>null</code> is actually
+well-defined.</p>
+<p>So dereferencing a pointer in <code>@safe</code> code is considered memory-safe because
+there's no way to access an invalid pointer from <code>@safe</code> code. It follows that
+any code which allows an invalid pointer to be accessed from <code>@safe</code> code is
+guilty of violating memory safety. Even if the offending code contains no
+undefined behavior.</p>
+<p>The easiest way for this to happen is for a <code>@trusted</code> function to either (a)
+create an invalid pointer and return it, or (b) invalidate an existing pointer
+that's accessible from <code>@safe</code> code.</p>
+<p>Currently, the only perfectly-reliable way to work with invalid pointers while
+preventing <code>@safe</code> code from accessing them is to store them in local variables
+of <code>@trusted</code> or <code>@system</code> functions (or in closures that capture those
+variables). For global variables and aggregate members, the only
+access-protection mechanism is <code>private</code>, which still allows access from
+<code>@safe</code> code in the same module.</p>
+<h3>What About Arrays?</h3>
+<p>Array access is considered memory-safe (and therefore <code>@safe</code>) because it's
+bounds-checked at runtime. But this bounds-checking relies on the fact that the
+<code>.length</code> property of an array matches the actual length of the array in
+memory. How is that guaranteed?</p>
+<p>Just like with pointers, D forbids, in <code>@safe</code> code, any operation that could
+possibly create an invalid array. In particular, any change to the array's
+length that <em>would</em> create an invalid array triggers a reallocation, using the
+GC.</p>
+<p>Because arrays are built into the language, their internals do not suffer from
+the same access-protection hole as <code>private</code> variables w.r.t. <code>@safe</code> code in
+the same module. In this way, built-in arrays are privileged over user-defined
+types, which have no equivalent access-protection mechanism.</p>
+<h3>Invariants, Generally</h3>
+<p>Generalizing from the above two examples, we can derive the general principle
+that any data which must uphold some run-time invariant in order to be "valid"
+(i.e., memory-safe to use) must <em>not</em> be directly accessible from <code>@safe</code> code,
+but instead encapsulated behind a <code>@safe</code>/<code>@trusted</code> interface that maintains
+that invariant.</p>
+<p>Some examples of such potentially-invalid data include:</p>
+<ul>
+<li>The tag and union of a tagged union.</li>
+<li>The reference count and data pointer of a reference-counted pointer.</li>
+<li>The allocator instance of an allocator-aware container.</li>
+</ul>
+<p>To protect potentially-invalid data from access from <code>@safe</code> code, there are
+several possible solutions:</p>
+<ol>
+<li>
+<p><strong>Hide the data inside closures.</strong> While this solution requires no language
+   changes, it is unsatisfactory because it requires the use of the GC and
+   substantially complicates the implementation of aggregates that wish to use
+   it.</p>
+</li>
+<li>
+<p><strong>Forbid <code>@safe</code> code from accessing <code>private</code> data, even in the same
+   module.</strong> While this would work, it is a breaking change, and would cause
+   many "false positives," since many <code>private</code> member variables are not
+   subject to memory-safety related invariants.</p>
+</li>
+<li>
+<p><strong>Allow the data to be explicitly marked as inaccessible from <code>@safe</code>
+   code.</strong> This is the solution proposed by <a href="https://github.com/dlang/DIPs/blob/8a14e07198a1c9cb7b497ae8c2ec66540fba8893/DIPs/DIP1035.md">DIP 1035</a>.</p>
+</li>
+<li>
+<p><strong>Just rely on <code>private</code>.</strong> This is not a total loss, since <code>private</code> does
+   provide <em>some</em> protection, but it means that all <code>@safe</code> functions in a
+   module that contains potentially-invalid variables or aggregate members must
+   be considered effectively <code>@trusted</code>, and subject to manual rather than
+   automatic verification of memory safety.</p>
+</li>
+</ol>
+<h3>Summary and Conclusions</h3>
+<p>Memory safety in D means both the absence of undefined behavior, and the
+absence of certain kinds of data (which I've termed "invalid") that could lead
+to undefined behavior. To corrupt memory means to either (a) invoke undefined
+behavior, or (b) expose invalid data to <code>@safe</code> code (which could then use it
+to invoke undefined behavior).</p>
+<p>To prove that a <code>@safe</code> program is memory safe, <em>all</em> of the following steps
+must be completed:</p>
+<ol>
+<li>Prove that the assumptions made by <code>@trusted</code> code about external functions
+   hold.</li>
+<li>Prove that, if those assumptions hold, the <code>@trusted</code> code is memory safe.</li>
+<li>Prove that, if the <code>@trusted</code> code is memory safe, the <code>@safe</code> code is
+   memory safe.</li>
+</ol>
+<p>Step 1 is performed by the party compiling and linking the program. Step 2 is
+performed by the author(s) of the <code>@trusted</code> code. And step 3 is performed by
+the compiler. If any step is skipped, or performed incorrectly, the proof is
+invalid.</p>
+<p>When performing step 3, the D compiler relies on the assumption that certain
+kinds of data (which I've termed "invalid") cannot be accessed from <code>@safe</code>
+code. It upholds this assumption automatically in purely-<code>@safe</code> code, and
+relies on the programmer to uphold it in <code>@trusted</code> code.</p>
+<p>Unfortunately, in the current D language, it is impossible for the programmer
+to uphold this assumption in <code>@trusted</code> code in all cases without making
+unacceptable feature, performance, and implementation-quality tradeoffs. DIP
+1035 would solve this problem. The current approach, of relying on <code>private</code>,
+requires manual verification of <code>@safe</code> code in order for the compiler's proof
+of memory safety to remain valid.</p>
+
+                    <div class="clear"></div>
+                    <div class="info">
+<a href="https://pbackus.github.io/blog/how-does-memory-safety-work-in-d.html">posted at 12:00 2020</a>&nbsp;&middot;&nbsp;<a href="https://pbackus.github.io/blog/category/programming.html" rel="tag">Programming</a>
+                        <div class="tags">
+                            <a href="https://pbackus.github.io/blog/tag/dlang.html" class="selected">dlang</a>
+                        </div>
+                    </div>
+                    <div class="clear"></div>
+                </div>
+
                 <h4 class="date">Oct 04, 2019</h4>
                 <div class="post">
 <h2 class="title">
@@ -55,7 +290,7 @@ compiled with optimization level <code>-O2</code>.</p>
   and returns a unique integer for each possible type the sum type can hold.</li>
 </ul>
 <p>For illustration's sake, here's the C++ version, slightly abridged:</p>
-<div class="highlight"><pre><span></span><span class="cp">#include</span> <span class="cpf">&lt;variant&gt;</span><span class="cp"></span>
+<div class="highlight"><pre><span></span><code><span class="cp">#include</span> <span class="cpf">&lt;variant&gt;</span><span class="cp"></span>
 
 <span class="c1">// Source: https://en.cppreference.com/w/cpp/utility/variant/visit</span>
 <span class="k">template</span><span class="o">&lt;</span><span class="n">class</span><span class="p">...</span> <span class="n">Ts</span><span class="o">&gt;</span> <span class="k">struct</span> <span class="nl">overloaded</span> <span class="p">:</span> <span class="n">Ts</span><span class="p">...</span> <span class="p">{</span> <span class="k">using</span> <span class="n">Ts</span><span class="o">::</span><span class="k">operator</span><span class="p">()...;</span> <span class="p">};</span>
@@ -77,7 +312,7 @@ compiled with optimization level <code>-O2</code>.</p>
         <span class="p">[](</span><span class="n">T9</span> <span class="n">val</span><span class="p">)</span> <span class="p">{</span> <span class="k">return</span> <span class="mi">233</span><span class="p">;</span> <span class="p">},</span>
     <span class="p">},</span> <span class="n">v</span><span class="p">);</span>
 <span class="p">}</span>
-</pre></div>
+</code></pre></div>
 
 
 <p>After compiling each program, I used <code>objdump</code> to disassemble them, and
@@ -92,7 +327,7 @@ and a switch statement for its "visit" function. It's the straightforward,
 obvious implementation you'd use if you were writing the code by hand, without
 worrying about making it generic, so it makes a good baseline to compare the
 other versions to.</p>
-<div class="highlight"><pre><span></span>00000000000000a0 &lt;do_visit&gt;:
+<div class="highlight"><pre><span></span><code>00000000000000a0 &lt;do_visit&gt;:
   a0:    cmp    $0xa,%edi         # check if type index is in-bounds
   a3:    jae    b0
   a5:    movslq %edi,%rax
@@ -106,7 +341,7 @@ other versions to.</p>
   bb:    mov    $0x0,%ecx
   c0:    mov    $0x45,%edx
   c5:    callq  ca                # __assert_fail
-</pre></div>
+</code></pre></div>
 
 
 <p>As you might expect, the compiler is able to optimize the entire thing down
@@ -118,7 +353,7 @@ helper template</a> from cppreference.com to allow passing a set of labmda
 functions as a visitor. This is standard-library code, so we should expect it
 to be as well-optimized as the best and brightest C++ developers around can
 make it.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;do_visit(std::__1::example_variant)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;do_visit(std::__1::example_variant)&gt;:
    0:    sub    $0x18,%rsp
    4:    mov    %rdi,%rax
    7:    mov    %rdi,0x8(%rsp)
@@ -136,7 +371,7 @@ make it.</p>
 
   # Error path
   38:    callq  3d               # __throw_bad_variant_access
-</pre></div>
+</code></pre></div>
 
 
 <p>The main thing to notice here is that, unlike in the C version, the compiler is
@@ -157,7 +392,7 @@ Phobos. Rather than create a dedicated sum type, the Phobos developers opted to
 make <code>Algebraic</code> a thin wrapper around <code>Variant</code>, D's equivalent of C++17's
 <code>std::any</code>. That choice turns out to have far-reaching repercussions, as we're
 about to see.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;int dalgebraic.do_visit(ExampleAlgebraic)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;int dalgebraic.do_visit(ExampleAlgebraic)&gt;:
    0:    jmpq   5 # int std.variant.visitImpl!(true, ExampleAlgebraic, ...)
 
 0000000000000000 &lt;int std.variant.visitImpl!(true, ExampleAlgebraic, ...)
@@ -216,7 +451,7 @@ about to see.</p>
  28a:    mov    $0x4b,%edi
  28f:    mov    $0xa1c,%edx
  294:    callq  299               # call D runtime assert function
-</pre></div>
+</code></pre></div>
 
 
 <p>The good part is that <code>ldc</code> is able to inline the lambdas into the body of
@@ -239,7 +474,7 @@ D code using <code>Algebraic</code>.</p>
 rely at all on runtime type information, and instead uses D's powerful
 compile-time reflection and metaprogramming capabilities to try to generate
 code as close to the C version as possible. Let's see how well it does.</p>
-<div class="highlight"><pre><span></span>0000000000000000 &lt;int dsumtype.do_visit(ExampleSumType)&gt;:
+<div class="highlight"><pre><span></span><code>0000000000000000 &lt;int dsumtype.do_visit(ExampleSumType)&gt;:
    0:    push   %rax
    1:    movsbq 0x10(%rsp),%rax    # get type index from stack
    7:    cmp    $0xa,%rax          # check if type index is in-bounds
@@ -254,7 +489,7 @@ code as close to the C version as possible. Let's see how well it does.</p>
   20:    mov    $0x4ca,%edi
   25:    mov    $0x9,%esi
   2a:    callq  2f                 # __switch_error
-</pre></div>
+</code></pre></div>
 
 
 <p>As it turns out, it's almost exactly the same as the C version: a single array
