@@ -2,7 +2,7 @@
 <html lang="en">
     <head>
         <meta http-equiv="Content-type" content="text/html; charset=utf-8" />
-        <title>Paul's Dev Blog &middot; How Does Memory Safety Work in D?</title>
+        <title>Paul's Dev Blog &middot; What Does Memory Safety Really Mean in D?</title>
         <link rel="shortcut icon" href="https://pbackus.github.io/blog/favicon.ico" />
 <link href="https://pbackus.github.io/blog/feeds/all.atom.xml" type="application/atom+xml" rel="alternate" title="Paul's Dev Blog Atom Feed" />
 
@@ -26,7 +26,7 @@
                 <h4 class="date">Aug 23, 2020</h4>
                 <div class="post">
 <h2 class="title">
-                        <a href="https://pbackus.github.io/blog/how-does-memory-safety-work-in-d.html" rel="bookmark" title="Permanent Link to &quot;How Does Memory Safety Work in D?&quot;">How Does Memory Safety Work in D?</a>
+                        <a href="https://pbackus.github.io/blog/what-does-memory-safety-really-mean-in-d.html" rel="bookmark" title="Permanent Link to &quot;What Does Memory Safety Really Mean in D?&quot;">What Does Memory Safety Really Mean in D?</a>
                     </h2>
 
                     <p>Recently, in the D community, there's been a good deal of discussion about what
@@ -96,7 +96,7 @@ library function <code>puts</code>. From reading the C99 standard, we know that 
 has defined behavior when called with a pointer to a null-terminated string,
 and undefined behavior otherwise, so we write our function as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@trusted</span> <span class="kt">void</span> <span class="n">safePuts</span><span class="p">(</span><span class="k">const</span><span class="p">(</span><span class="kt">char</span><span class="p">)[]</span> <span class="n">s</span><span class="p">)</span> <span class="p">{</span>
-    <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">[$]</span> <span class="p">!=</span> <span class="sc">&#39;\0&#39;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">[$</span> <span class="p">-</span> <span class="mi">1</span><span class="p">]</span> <span class="p">!=</span> <span class="sc">&#39;\0&#39;</span><span class="p">)</span>
         <span class="k">throw</span> <span class="k">new</span> <span class="n">Exception</span><span class="p">(</span><span class="s">&quot;s must be null-terminated&quot;</span><span class="p">);</span>
     <span class="n">puts</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">ptr</span><span class="p">);</span>
 <span class="p">}</span>
@@ -104,7 +104,7 @@ and undefined behavior otherwise, so we write our function as follows:</p>
 
 
 <p>Now we ask: what would have to go wrong for this function to corrupt memory?</p>
-<p>The array access, <code>s[$]</code>, can't corrupt memory, because array accesses in D are
+<p>The array access, <code>s[$ - 1]</code>, can't corrupt memory, because array accesses in D are
 bounds-checked. Similarly, we know that comparing two characters and throwing
 an exception are both safe operations, because their behavior as defined by the
 language spec does not include any possibility of memory corruption. The only
@@ -235,12 +235,12 @@ must be completed:</p>
 </ol>
 <p>Step 1 is performed by the party compiling and linking the program. Step 2 is
 performed by the author(s) of the <code>@trusted</code> code. And step 3 is performed by
-the compiler. If any step is skipped, or performed incorrectly, the proof is
-invalid.</p>
-<p>When performing step 3, the D compiler relies on the assumption that certain
-kinds of data (which I've termed "invalid") cannot be accessed from <code>@safe</code>
-code. It upholds this assumption automatically in purely-<code>@safe</code> code, and
-relies on the programmer to uphold it in <code>@trusted</code> code.</p>
+the compiler. If any step is skipped, or performed incorrectly, the proof does
+not hold.</p>
+<p>When performing step 3, the D compiler relies on the assumption that invalid
+data cannot be accessed from <code>@safe</code> code. It upholds this assumption
+automatically in purely-<code>@safe</code> code, and relies on the programmer to uphold it
+in <code>@trusted</code> code.</p>
 <p>Unfortunately, in the current D language, it is impossible for the programmer
 to uphold this assumption in <code>@trusted</code> code in all cases without making
 unacceptable feature, performance, and implementation-quality tradeoffs. DIP
@@ -250,7 +250,7 @@ of memory safety to remain valid.</p>
 
                     <div class="clear"></div>
                     <div class="info">
-<a href="https://pbackus.github.io/blog/how-does-memory-safety-work-in-d.html">posted at 12:00 2020</a>&nbsp;&middot;&nbsp;<a href="https://pbackus.github.io/blog/category/programming.html" rel="tag">Programming</a>
+<a href="https://pbackus.github.io/blog/what-does-memory-safety-really-mean-in-d.html">posted at 12:00 2020</a>&nbsp;&middot;&nbsp;<a href="https://pbackus.github.io/blog/category/programming.html" rel="tag">Programming</a>
                         <div class="tags">
                             <a href="https://pbackus.github.io/blog/tag/dlang.html">dlang</a>
                         </div>

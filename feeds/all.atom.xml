@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<feed xmlns="http://www.w3.org/2005/Atom"><title>Paul's Dev Blog</title><link href="https://pbackus.github.io/blog/" rel="alternate"></link><link href="https://pbackus.github.io/blog/feeds/all.atom.xml" rel="self"></link><id>https://pbackus.github.io/blog/</id><updated>2020-08-23T00:00:00-04:00</updated><entry><title>How Does Memory Safety Work in D?</title><link href="https://pbackus.github.io/blog/how-does-memory-safety-work-in-d.html" rel="alternate"></link><published>2020-08-23T00:00:00-04:00</published><updated>2020-08-23T00:00:00-04:00</updated><author><name>Paul Backus</name></author><id>tag:pbackus.github.io,2020-08-23:/blog/how-does-memory-safety-work-in-d.html</id><summary type="html">&lt;p&gt;Recently, in the D community, there's been a good deal of discussion about what
+<feed xmlns="http://www.w3.org/2005/Atom"><title>Paul's Dev Blog</title><link href="https://pbackus.github.io/blog/" rel="alternate"></link><link href="https://pbackus.github.io/blog/feeds/all.atom.xml" rel="self"></link><id>https://pbackus.github.io/blog/</id><updated>2020-08-23T00:00:00-04:00</updated><entry><title>What Does Memory Safety Really Mean in D?</title><link href="https://pbackus.github.io/blog/what-does-memory-safety-really-mean-in-d.html" rel="alternate"></link><published>2020-08-23T00:00:00-04:00</published><updated>2020-08-23T00:00:00-04:00</updated><author><name>Paul Backus</name></author><id>tag:pbackus.github.io,2020-08-23:/blog/what-does-memory-safety-really-mean-in-d.html</id><summary type="html">&lt;p&gt;Recently, in the D community, there's been a good deal of discussion about what
 exactly is meant by "memory safety," and under what circumstances (if any) it's
 appropriate to consider an &lt;code&gt;extern(C)&lt;/code&gt; function to be "memory safe." This post
 is my attempt to clarify my own thoughts on the …&lt;/p&gt;</summary><content type="html">&lt;p&gt;Recently, in the D community, there's been a good deal of discussion about what
@@ -69,7 +69,7 @@ library function &lt;code&gt;puts&lt;/code&gt;. From reading the C99 standard, w
 has defined behavior when called with a pointer to a null-terminated string,
 and undefined behavior otherwise, so we write our function as follows:&lt;/p&gt;
 &lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;&lt;span class="nd"&gt;@trusted&lt;/span&gt; &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;safePuts&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;const&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt;&lt;span class="p"&gt;)[]&lt;/span&gt; &lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
-    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;[$]&lt;/span&gt; &lt;span class="p"&gt;!=&lt;/span&gt; &lt;span class="sc"&gt;&amp;#39;\0&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;[$&lt;/span&gt; &lt;span class="p"&gt;-&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="p"&gt;!=&lt;/span&gt; &lt;span class="sc"&gt;&amp;#39;\0&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
         &lt;span class="k"&gt;throw&lt;/span&gt; &lt;span class="k"&gt;new&lt;/span&gt; &lt;span class="n"&gt;Exception&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;s must be null-terminated&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
     &lt;span class="n"&gt;puts&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ptr&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
 &lt;span class="p"&gt;}&lt;/span&gt;
@@ -77,7 +77,7 @@ and undefined behavior otherwise, so we write our function as follows:&lt;/p&gt;
 
 
 &lt;p&gt;Now we ask: what would have to go wrong for this function to corrupt memory?&lt;/p&gt;
-&lt;p&gt;The array access, &lt;code&gt;s[$]&lt;/code&gt;, can't corrupt memory, because array accesses in D are
+&lt;p&gt;The array access, &lt;code&gt;s[$ - 1]&lt;/code&gt;, can't corrupt memory, because array accesses in D are
 bounds-checked. Similarly, we know that comparing two characters and throwing
 an exception are both safe operations, because their behavior as defined by the
 language spec does not include any possibility of memory corruption. The only
@@ -208,12 +208,12 @@ must be completed:&lt;/p&gt;
 &lt;/ol&gt;
 &lt;p&gt;Step 1 is performed by the party compiling and linking the program. Step 2 is
 performed by the author(s) of the &lt;code&gt;@trusted&lt;/code&gt; code. And step 3 is performed by
-the compiler. If any step is skipped, or performed incorrectly, the proof is
-invalid.&lt;/p&gt;
-&lt;p&gt;When performing step 3, the D compiler relies on the assumption that certain
-kinds of data (which I've termed "invalid") cannot be accessed from &lt;code&gt;@safe&lt;/code&gt;
-code. It upholds this assumption automatically in purely-&lt;code&gt;@safe&lt;/code&gt; code, and
-relies on the programmer to uphold it in &lt;code&gt;@trusted&lt;/code&gt; code.&lt;/p&gt;
+the compiler. If any step is skipped, or performed incorrectly, the proof does
+not hold.&lt;/p&gt;
+&lt;p&gt;When performing step 3, the D compiler relies on the assumption that invalid
+data cannot be accessed from &lt;code&gt;@safe&lt;/code&gt; code. It upholds this assumption
+automatically in purely-&lt;code&gt;@safe&lt;/code&gt; code, and relies on the programmer to uphold it
+in &lt;code&gt;@trusted&lt;/code&gt; code.&lt;/p&gt;
 &lt;p&gt;Unfortunately, in the current D language, it is impossible for the programmer
 to uphold this assumption in &lt;code&gt;@trusted&lt;/code&gt; code in all cases without making
 unacceptable feature, performance, and implementation-quality tradeoffs. DIP
