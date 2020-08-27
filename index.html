@@ -87,7 +87,7 @@ Is there any way to prove that such a function is memory-safe?</p>
 <p>The strict, hard-line answer is...no. It's impossible. When you write an
 <code>extern</code> function declaration, the only guarantee you have is that the function
 you call matches the specified signature. The actual implementation of that
-function isn't know until your program is compiled and linked--or in the case
+function isn't known until your program is compiled and linked--or in the case
 of dynamic linking, until it's executed!</p>
 <p>Does that mean <code>@trusted</code> is useless? Not quite. To see why, let's look at an
 an example.</p>
