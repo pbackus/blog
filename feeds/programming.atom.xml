@@ -69,6 +69,8 @@ library function &lt;code&gt;puts&lt;/code&gt;. From reading the C99 standard, w
 has defined behavior when called with a pointer to a null-terminated string,
 and undefined behavior otherwise, so we write our function as follows:&lt;/p&gt;
 &lt;div class="highlight"&gt;&lt;pre&gt;&lt;span&gt;&lt;/span&gt;&lt;code&gt;&lt;span class="nd"&gt;@trusted&lt;/span&gt; &lt;span class="kt"&gt;void&lt;/span&gt; &lt;span class="n"&gt;safePuts&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="k"&gt;const&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="kt"&gt;char&lt;/span&gt;&lt;span class="p"&gt;)[]&lt;/span&gt; &lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt; &lt;span class="p"&gt;{&lt;/span&gt;
+    &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;length&lt;/span&gt; &lt;span class="p"&gt;==&lt;/span&gt; &lt;span class="mi"&gt;0&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
+        &lt;span class="k"&gt;throw&lt;/span&gt; &lt;span class="k"&gt;new&lt;/span&gt; &lt;span class="n"&gt;Exception&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;s must not be empty&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
     &lt;span class="k"&gt;if&lt;/span&gt; &lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;[$&lt;/span&gt; &lt;span class="p"&gt;-&lt;/span&gt; &lt;span class="mi"&gt;1&lt;/span&gt;&lt;span class="p"&gt;]&lt;/span&gt; &lt;span class="p"&gt;!=&lt;/span&gt; &lt;span class="sc"&gt;&amp;#39;\0&amp;#39;&lt;/span&gt;&lt;span class="p"&gt;)&lt;/span&gt;
         &lt;span class="k"&gt;throw&lt;/span&gt; &lt;span class="k"&gt;new&lt;/span&gt; &lt;span class="n"&gt;Exception&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="s"&gt;&amp;quot;s must be null-terminated&amp;quot;&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
     &lt;span class="n"&gt;puts&lt;/span&gt;&lt;span class="p"&gt;(&lt;/span&gt;&lt;span class="n"&gt;s&lt;/span&gt;&lt;span class="p"&gt;.&lt;/span&gt;&lt;span class="n"&gt;ptr&lt;/span&gt;&lt;span class="p"&gt;);&lt;/span&gt;
@@ -77,11 +79,12 @@ and undefined behavior otherwise, so we write our function as follows:&lt;/p&gt;
 
 
 &lt;p&gt;Now we ask: what would have to go wrong for this function to corrupt memory?&lt;/p&gt;
-&lt;p&gt;The array access, &lt;code&gt;s[$ - 1]&lt;/code&gt;, can't corrupt memory, because array accesses in D are
-bounds-checked. Similarly, we know that comparing two characters and throwing
-an exception are both safe operations, because their behavior as defined by the
-language spec does not include any possibility of memory corruption. The only
-remaining thing that could possibly go wrong is the call to &lt;code&gt;puts&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;The array access, &lt;code&gt;s[$ - 1]&lt;/code&gt;, can't corrupt memory, because array accesses in D
+are bounds-checked. Similarly, we know that checking the length of an array,
+comparing two characters, and throwing an exception are all safe operations,
+because their behavior as defined by the language spec does not include any
+possibility of memory corruption. The only remaining thing that could possibly
+go wrong is the call to &lt;code&gt;puts&lt;/code&gt;.&lt;/p&gt;
 &lt;p&gt;Let's assume, for now, that the only way a call to &lt;code&gt;puts&lt;/code&gt; can corrupt memory is
 by causing undefined behavior. There are two possible ways this could happen:&lt;/p&gt;
 &lt;ol&gt;

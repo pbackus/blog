@@ -96,6 +96,8 @@ library function <code>puts</code>. From reading the C99 standard, we know that 
 has defined behavior when called with a pointer to a null-terminated string,
 and undefined behavior otherwise, so we write our function as follows:</p>
 <div class="highlight"><pre><span></span><code><span class="nd">@trusted</span> <span class="kt">void</span> <span class="n">safePuts</span><span class="p">(</span><span class="k">const</span><span class="p">(</span><span class="kt">char</span><span class="p">)[]</span> <span class="n">s</span><span class="p">)</span> <span class="p">{</span>
+    <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">length</span> <span class="p">==</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="k">throw</span> <span class="k">new</span> <span class="n">Exception</span><span class="p">(</span><span class="s">&quot;s must not be empty&quot;</span><span class="p">);</span>
     <span class="k">if</span> <span class="p">(</span><span class="n">s</span><span class="p">[$</span> <span class="p">-</span> <span class="mi">1</span><span class="p">]</span> <span class="p">!=</span> <span class="sc">&#39;\0&#39;</span><span class="p">)</span>
         <span class="k">throw</span> <span class="k">new</span> <span class="n">Exception</span><span class="p">(</span><span class="s">&quot;s must be null-terminated&quot;</span><span class="p">);</span>
     <span class="n">puts</span><span class="p">(</span><span class="n">s</span><span class="p">.</span><span class="n">ptr</span><span class="p">);</span>
@@ -104,11 +106,12 @@ and undefined behavior otherwise, so we write our function as follows:</p>
 
 
 <p>Now we ask: what would have to go wrong for this function to corrupt memory?</p>
-<p>The array access, <code>s[$ - 1]</code>, can't corrupt memory, because array accesses in D are
-bounds-checked. Similarly, we know that comparing two characters and throwing
-an exception are both safe operations, because their behavior as defined by the
-language spec does not include any possibility of memory corruption. The only
-remaining thing that could possibly go wrong is the call to <code>puts</code>.</p>
+<p>The array access, <code>s[$ - 1]</code>, can't corrupt memory, because array accesses in D
+are bounds-checked. Similarly, we know that checking the length of an array,
+comparing two characters, and throwing an exception are all safe operations,
+because their behavior as defined by the language spec does not include any
+possibility of memory corruption. The only remaining thing that could possibly
+go wrong is the call to <code>puts</code>.</p>
 <p>Let's assume, for now, that the only way a call to <code>puts</code> can corrupt memory is
 by causing undefined behavior. There are two possible ways this could happen:</p>
 <ol>
